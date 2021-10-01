@@ -130,3 +130,6 @@ dmypy.json
 
 #Microsoft Shenanigans 
 ~*.xlsx
+
+#Ignore non-public files
+*.gb
