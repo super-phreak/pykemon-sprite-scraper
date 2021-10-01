@@ -117,7 +117,6 @@ def parseData(packet_type):
 
 parseData(packet_type)
 if mew_sprite_compressed.peek('uint:1') == 0:
-    print("mode 0 found")
     sprite_info['zip_mode'] = mew_sprite_compressed.read('uint:1')
 else:
     sprite_info['zip_mode'] = mew_sprite_compressed.read('uint:2')
