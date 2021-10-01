@@ -5,7 +5,6 @@ def expandRLEPacket(bit_length, value):
 
 def findRLEBound(sprite_data):
     length_found = sprite_data.readto('0b0')
-    print("length_found",length_found)
     return length_found
 
 def mode1(buf0, buf1):
@@ -62,8 +61,6 @@ def deltaDecode(arr):
         if bit:
             currentBit = currentBit ^ 1
         output.append('0b%s' % currentBit)
-    print('arr',arr,'len',arr.len)
-    print('output',output,'len',output.len)
     return output
 
 mew_sprite_compressed = BitStream(hex='0x55be0553c37eaf5304e6507d5ad2633548552546ad8118d66baaf52942213650a07f2126a92638d6e45810554e1a2a752288889218ed8b81391548418a55354a70c114c7ab5349217e15943549562548589a8548509ffc8a07a885ad55e294149a214850aa828232b8ba38a94e35689525794e586d46ffb78ebaffffa3aa7c0a09e1b0d040982732a420fa9319a52291d176911adad0c3c52431299c311f11a4430d6846893e4e12452a9c31563e4bf9169d3e4fe5e11c6a3e2871871ad93e4ca1e4b109b513e985fd6bde5a5aa534457a1117040c3135861598dc63025264f1c8826ef471d4090a928b47577f908677c551d844be2d5fffd7d4ddea0555afff386ea0af5af38288526bd4d6f85e32a3d3b4f028f25ce6bfd5e3b2a3ea2c5a30ab82e09ba42a4b4f6a707128c08539aaf15445409c1109e0260a752a1475d18e73242439d7059f84097')
@@ -74,8 +71,6 @@ mew_offset = 0
 
 
 mew_sprite_compressed.pos += mew_offset
-
-print(mew_sprite_compressed.peek('hex:16'))
 
 sprite_info = {}
 sprite_info['width'] = mew_sprite_compressed.read('uint:4')
@@ -90,12 +85,9 @@ sprite_data['mew_sprite'] = {
     'sprite': []
 }
 
-print(sprite_info)
-
 def parseData(packet_type):
     data_packet_count = 1
     while sprite_data['mew_sprite']['bit_planes'][sprite_info['active_bit_plane']].len < (sprite_info['width']*sprite_info['height']*64):
-        print('Peek:',mew_sprite_compressed.peek('bin:2'),'PKT:',packet_type)
         if packet_type == 0:
             length = findRLEBound(mew_sprite_compressed)
             value = mew_sprite_compressed.read(("uint:%s" % length.len))
