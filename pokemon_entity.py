@@ -1,4 +1,4 @@
-from sprite import Sprite
+from image import Sprite
 
 class Pokemon:
     def __init__(self, name, back_sprite, front_sprite) -> None:
