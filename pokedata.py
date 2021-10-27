@@ -1,322 +1,705 @@
-from bitstring import BitArray, Bits, BitString, ConstBitStream
-from image import Sprite
-from pokemon_entity import Pokemon
+from bitstring import Bits, BitString, BitArray, ConstBitStream
 
-def expandRLEPacket(bit_length, value) -> BitString:
-    return BitString((bit_length+value+1)*2)
+import base64
 
-def findRLEBound(sprite_data) -> Bits:
-    length_found = sprite_data.readto('0b0')
-    return length_found
+class Addr:
+    def __init__(self,bank,addr) -> None:
+        self.bank = bank
+        self.addr = addr
 
-def mode1(sprite) -> list:
-    sprite.bit_planes[1] = deltaDecode(sprite.bit_planes[1],sprite.width)
-    sprite.bit_planes[0] = deltaDecode(sprite.bit_planes[0],sprite.width)
-    return sprite.bit_planes
+    def absolute_pos(self) -> int:
+        return (((self.bank-1)*BANK_SIZE)+self.addr)
 
-def mode2(sprite) -> list:
-    sprite.bit_planes[1] = deltaDecode(sprite.bit_planes[1],sprite.width)
-    sprite.bit_planes[0] = sprite.bit_planes[0] ^ sprite.bit_planes[1] 
-    return sprite.bit_planes
-
-def mode3(sprite) -> list:
-    sprite.bit_planes[1] = deltaDecode(sprite.bit_planes[1],sprite.width)
-    sprite.bit_planes[0] = deltaDecode(sprite.bit_planes[0],sprite.width)
-    sprite.bit_planes[0] = sprite.bit_planes[0] ^ sprite.bit_planes[1]
-    return sprite.bit_planes
-
-def fillMatrix(arr,row_num, coloumn_num) -> BitArray:
-    #Array math is hard touch numbers at own risk
-    matrix = [[0 for x in range(coloumn_num*4)] for y in range(row_num*8)]
-    for row in range(row_num*8):
-        for col in range(coloumn_num*4):
-            matrix[row][col]=(''.join(arr[((col*row_num*16)+(row*2)):((col*row_num*16)+(row*2))+2].bin))
-        matrix[row] = ''.join(matrix[row])
-        output = BitArray()
-    for out_row in matrix:    
-        output.append('0b'+out_row)
-
-    return output
-
-def bufferToList(arr, row_num, coloumn_num) -> list:
-    bufList = [0] * row_num*8
-    column_bits = coloumn_num*8
-    for row in range(row_num*8):
-        bufList[row]=list(map(int,(','.join(arr[(row*column_bits):((row*column_bits)+column_bits)].bin).split(','))))
-
-    return bufList
-
-def combineBuffers(sprite) -> list:
-    result = [[(sprite.bit_planes[sprite.high_bit_plane][i][j]<<1) + sprite.bit_planes[sprite.high_bit_plane^1][i][j]  for j in range(len(sprite.bit_planes[sprite.high_bit_plane][0]))] for i in range(len(sprite.bit_planes[1]))]
-    return result
-
-
-def printPixels(buffer):
-    for row in buffer:
-        print(','.join(map(str,row)))
-        
-
-def deltaDecode(arr, width) -> BitArray:
-    output = BitArray()
-    currentBit = 0
-    for index, bit in enumerate(arr):
-        if index % (width*8) == 0:
-            currentBit = 0
-        if bit:
-            currentBit = (currentBit ^ 1)
-        
-        output.append('0b%s' % currentBit)
-    return output
-
-def parseData(packet_type, sprite):
-    data_packet_count = 1
-    while sprite.bit_planes[sprite.active_bit_plane].len < (sprite.width*sprite.height*64):
-        if packet_type == 0:
-            length = findRLEBound(rom)
-            value = rom.read((f"uint:{length.len}"))
-            zero_bits = expandRLEPacket(length.uint,value)
-            sprite.bit_planes[sprite.active_bit_plane].append(zero_bits)
-            packet_type = 1
-            data_packet_count = 1
-        else:
-            data_packet = rom.read('bin:2')
-
-            if data_packet != '00':
-                sprite.bit_planes[sprite.active_bit_plane].append('0b'+data_packet)
-                data_packet_count+=1
-            else:
-                packet_type = 0
-
-        #Debug print for pulling my hair out on why it didnt work
-        #print(len(sprite_data['mew_sprite']['bit_planes'][sprite_info['active_bit_plane']]),'Pos: ', (rom.pos),'PKT:', packet_type) 
-
-def parseSprite(sprite, index) -> Sprite:
-    pass
-
-def printPkmnFront(pkmn):
-    ### Debug Prints ###
-    # print(pkmn.front_sprite)
-    # printPixels(pkmn.front_sprite.bit_planes[0])
-    # print()
-    # printPixels(pkmn.front_sprite.bit_planes[1])
-    # print()
-    ### Debug Prints ###
-    printPixels(pkmn.front_sprite.sprite)
-def printPkmnBack(pkmn):
-    ### Debug Prints ###
-    # print(pkmn.back_sprite)
-    # printPixels(pkmn.back_sprite.bit_planes[0])
-    # print()
-    # printPixels(pkmn.back_sprite.bit_planes[1])
-    # print()
-    ### Debug Prints ###
-    printPixels(pkmn.back_sprite.sprite)
-def printPkmn(pkmn,sprite):
-    if sprite == 0:
-        printPkmnBack(pkmn)
-    else:
-        printPkmnFront(pkmn)
-
-rom = ConstBitStream(filename='Pokemon Red.gb')
-pokedex = [
-    ('RHYDON',[0x00024202,0x00024000]),
-    ('KANGASKHAN',[0x000244A6,0x0002429A]),
-    ('NIDORAN_M',[0x00024623,0x0002453C]),
-    ('CLEFAIRY',[0x00024785,0x00024682]),
-    ('SPEAROW',[0x000248C2,0x000247DF]),
-    ('VOLTORB',[0x0002499A,0x00024911]),
-    ('NIDOKING',[0x00024C60,0x000249F8]),
-    ('SLOWBRO',[0x00024F87,0x00024D0A]),
-    ('IVYSAUR',[0x00025157,0x0002502B]),
-    ('EXEGGUTOR',[0x000253F8,0x000251D6]),
-    ('LICKITUNG',[0x0002563E,0x000254A7]),
-    ('EXEGGCUTE',[0x000258F0,0x000256D7]),
-    ('GRIMER',[0x00025AB0,0x00025973]),
-    ('GENGAR',[0x00025CC6,0x00025B76]),
-    ('NIDORAN_F',[0x00025DC2,0x00025D28]),
-    ('NIDOQUEEN',[0x00025FEF,0x00025E09]),
-    ('CUBONE',[0x00026196,0x000260A8]),
-    ('RHYHORN',[0x0002640F,0x00026208]),
-    ('LAPRAS',[0x0002667C,0x000264C1]),
-    ('ARCANINE',[0x0002693D,0x000266FF]),
-    ('GYARADOS',[0x00026C25,0x000269D4]),
-    ('SHELLDER',[0x00026DC3,0x00026CB6]),
-    ('TENTACOOL',[0x00026F1C,0x00026E2A]),
-    ('GASTLY',[0x00027190,0x00026F77]),
-    ('SCYTHER',[0x0002743C,0x0002721C]),
-    ('STARYU',[0x000275EC,0x000274E0]),
-    ('BLASTOISE',[0x00027851,0x00027637]),
-    ('PINSIR',[0x00027AAA,0x000278DA]),
-    ('TANGELA',[0x00027CE7,0x00027B39]),
-    ('GROWLITHE',[0x00028101,0x00028000]),
-    ('ONIX',[0x00028300,0x00028164]),
-    ('FEAROW',[0x00028529,0x00028383]),
-    ('PIDGEY',[0x0002865B,0x000285A7]),
-    ('SLOWPOKE',[0x000287C2,0x000286A0]),
-    ('KADABRA',[0x000289B9,0x00028830]),
-    ('GRAVELER',[0x00028C00,0x00028A4C]),
-    ('CHANSEY',[0x00028E21,0x00028CAE]),
-    ('MACHOKE',[0x00029063,0x00028E85]),
-    ('MR_MIME',[0x00029247,0x000290F3]),
-    ('HITMONLEE',[0x0002945E,0x000292BF]),
-    ('HITMONCHAN',[0x00029643,0x000294BC]),
-    ('ARBOK',[0x00029911,0x000296B4]),
-    ('PARASECT',[0x00029B8C,0x000299A8]),
-    ('PSYDUCK',[0x00029D3E,0x00029C0A]),
-    ('DROWZEE',[0x00029F05,0x00029DA9]),
-    ('GOLEM',[0x0002A0F2,0x00029F74]),
-    ('MAGMAR',[0x0002A2BF,0x0002A161]),
-    ('ELECTABUZZ',[0x0002A4EF,0x0002A367]),
-    ('MAGNETON',[0x0002A723,0x0002A588]),
-    ('KOFFING',[0x0002A974,0x0002A7A6]),
-    ('MANKEY',[0x0002AB16,0x0002AA11]),
-    ('SEEL',[0x0002ACE8,0x0002AB84]),
-    ('DIGLETT',[0x0002AE10,0x0002AD33]),
-    ('TAUROS',[0x0002B054,0x0002AE7E]),
-    ('FARFETCHD',[0x0002B2C6,0x0002B0E9]),
-    ('VENONAT',[0x0002B45C,0x0002B357]),
-    ('DRAGONITE',[0x0002B67F,0x0002B4AA]),
-    ('DODUO',[0x0002B80D,0x0002B72C]),
-    ('POLIWAG',[0x0002B947,0x0002B875]),
-    ('JYNX',[0x0002BB42,0x0002B98E]),
-    ('MOLTRES',[0x0002BE02,0x0002BBAC]),
-    ('ARTICUNO',[0x0002C238,0x0002C000]),
-    ('ZAPDOS',[0x0002C484,0x0002C29D]),
-    ('DITTO',[0x0002C5BD,0x0002C514]),
-    ('MEOWTH',[0x0002C71F,0x0002C609]),
-    ('KRABBY',[0x0002C8B0,0x0002C777]),
-    ('VULPIX',[0x0002CA9A,0x0002C924]),
-    ('NINETALES',[0x0002CCFB,0x0002CAFF]),
-    ('PIKACHU',[0x0002CE8B,0x0002CD7D]),
-    ('RAICHU',[0x0002D0C3,0x0002CF03]),
-    ('DRATINI',[0x0002D234,0x0002D151]),
-    ('DRAGONAIR',[0x0002D3D9,0x0002D297]),
-    ('KABUTO',[0x0002D529,0x0002D464]),
-    ('KABUTOPS',[0x0002D73C,0x0002D583]),
-    ('HORSEA',[0x0002D873,0x0002D7C1]),
-    ('SEADRA',[0x0002DA2B,0x0002D8C4]),
-    ('SANDSHREW',[0x0002DBE7,0x0002DAC9]),
-    ('SANDSLASH',[0x0002DE04,0x0002DC6B]),
-    ('OMANYTE',[0x0002DF76,0x0002DE9D]),
-    ('OMASTAR',[0x0002E18B,0x0002DFD3]),
-    ('JIGGLYPUFF',[0x0002E30F,0x0002E22F]),
-    ('WIGGLYTUFF',[0x0002E4BF,0x0002E348]),
-    ('EEVEE',[0x0002E625,0x0002E531]),
-    ('FLAREON',[0x0002E806,0x0002E68D]),
-    ('JOLTEON',[0x0002EA0A,0x0002E88F]),
-    ('VAPOREON',[0x0002EC02,0x0002EAAE]),
-    ('MACHOP',[0x0002EDA2,0x0002EC9F]),
-    ('ZUBAT',[0x0002EF17,0x0002EE0C]),
-    ('EKANS',[0x0002F06D,0x0002EF6B]),
-    ('PARAS',[0x0002F177,0x0002F0B4]),
-    ('POLIWHIRL',[0x0002F35E,0x0002F1ED]),
-    ('POLIWRATH',[0x0002F52C,0x0002F3C1]),
-    ('WEEDLE',[0x0002F624,0x0002F57D]),
-    ('KAKUNA',[0x0002F736,0x0002F677]),
-    ('BEEDRILL',[0x0002F980,0x0002F788]),
-    ('DODRIO',[0x000301A2,0x00030000]),
-    ('PRIMEAPE',[0x00030408,0x00030247]),
-    ('DUGTRIO',[0x0003062A,0x00030480]),
-    ('VENOMOTH',[0x00030841,0x000306A9]),
-    ('DEWGONG',[0x000309E2,0x00030899]),
-    ('CATERPIE',[0x00030AE1,0x00030A49]),
-    ('METAPOD',[0x00030BC8,0x00030B3A]),
-    ('BUTTERFREE',[0x00030E0E,0x00030C37]),
-    ('MACHAMP',[0x0003108C,0x00030E93]),
-    ('GOLDUCK',[0x000312C2,0x00031108]),
-    ('HYPNO',[0x00031552,0x0003135D]),
-    ('GOLBAT',[0x0003180A,0x000315E0]),
-    ('MEWTWO',[0x00031A85,0x0003187F]),
-    ('SNORLAX',[0x00031CE5,0x00031B19]),
-    ('MAGIKARP',[0x00031EC3,0x00031D31]),
-    ('MUK',[0x0003215F,0x00031F56]),
-    ('KINGLER',[0x000323DE,0x000321EC]),
-    ('CLOYSTER',[0x000326AB,0x0003247F]),
-    ('ELECTRODE',[0x00032827,0x00032760]),
-    ('CLEFABLE',[0x000329B8,0x0003288C]),
-    ('WEEZING',[0x00032C76,0x00032A44]),
-    ('PERSIAN',[0x00032F04,0x00032D1E]),
-    ('MAROWAK',[0x00033101,0x00032F8F]),
-    ('HAUNTER',[0x00033345,0x0003318A]),
-    ('ABRA',[0x000334CF,0x000333CC]),
-    ('ALAKAZAM',[0x00033779,0x0003355A]),
-    ('PIDGEOTTO',[0x0003395B,0x0003380A]),
-    ('PIDGEOT',[0x00033B79,0x000339C2]),
-    ('STARMIE',[0x00033DAC,0x00033C1C]),
-    ('BULBASAUR',[0x000340E5,0x00034000]),
-    ('VENUSAUR',[0x00034397,0x00034162]),
-    ('TENTACRUEL',[0x000345C3,0x00034455]),
-    ('GOLDEEN',[0x00034796,0x0003466F]),
-    ('SEAKING',[0x00034A03,0x00034803]),
-    ('PONYTA',[0x00034E32,0x00034AB1]),
-    ('RAPIDASH',[0x00034EBA,0x00034C10]),
-    ('RATTATA',[0x00035041,0x00034F6A]),
-    ('RATICATE',[0x0003520D,0x0003507A]),
-    ('NIDORINO',[0x000353F0,0x00035282]),
-    ('NIDORINA',[0x000355C8,0x0003548B]),
-    ('GEODUDE',[0x00035729,0x0003564F]),
-    ('PORYGON',[0x000358D1,0x00035784]),
-    ('AERODACTYL',[0x00035AEC,0x00035931]),
-    ('MAGNEMITE',[0x00035C0D,0x00035B87]),
-    ('CHARMANDER',[0x00035D5C,0x00035C5C]),
-    ('SQUIRTLE',[0x00035E8F,0x00035DB8]),
-    ('CHARMELEON',[0x00036048,0x00035F0C]),
-    ('WARTORTLE',[0x000361F1,0x000360B1]),
-    ('CHARIZARD',[0x00036495,0x00036286]),
-    ('ODDISH',[0x000368A9,0x0003680B]),
-    ('GLOOM',[0x00036A78,0x00036941]),
-    ('VILEPLUME',[0x00036C82,0x00036B21]),
-    ('BELLSPROUT',[0x00036DBA,0x00036D00]),
-    ('WEEPINBELL',[0x00036F6F,0x00036E30]),
-    ('VICTREEBEL',[0x000371B2,0x00036FEA]),
-    ('AERODACTYL_F',[0x00036536,0x00036536]),
-    ('GHOST',[0x000366B5,0x000366B5])
-]
-
-mons = {}
-
-for mon in pokedex:
-    sprites = []
-    for i in range(2):
-        rom.pos = mon[1][i]*8
-        sprite = Sprite(int(rom.pos/8),rom.read('uint:4'),rom.read('uint:4'),rom.read('uint:1'))
-        packet_type = rom.read('uint:1')
-        parseData(packet_type,sprite)
-
-        if rom.peek('uint:1') == 0:
-            print("ZIP MODE0")
-            sprite.zip_mode = rom.read('uint:1')
-        else:
-            sprite.zip_mode = rom.read('uint:2')
-
-        sprite.move_bitplane()
-        packet_type = rom.read('uint:1')
-
-        parseData(packet_type,sprite)
-
-        sprite.bit_planes[0] = fillMatrix(sprite.bit_planes[0],sprite.width,sprite.height)
-        sprite.bit_planes[1] = fillMatrix(sprite.bit_planes[1],sprite.width,sprite.height)
-
-        if sprite.zip_mode == 0:
-            sprite.bit_planes = mode1(sprite)
-        elif sprite.zip_mode == 2:
-            sprite.bit_planes = mode2(sprite)
-        else:
-            sprite.bit_planes = mode3(sprite)
-
-        sprite.bit_planes[0] = bufferToList(sprite.bit_planes[0],sprite.width,sprite.height)
-        sprite.bit_planes[1] = bufferToList(sprite.bit_planes[1],sprite.width,sprite.height)
-
-        sprite.sprite = combineBuffers(sprite)
-        rom.pos = ((int(rom.pos/8))+1)*8
-        sprite.bitlength = int(rom.pos/8) - sprite.rom_index
-        sprites.append(sprite)
+    @classmethod
+    def convert_to_addr(cls, long_addr) -> None:
+        bank = int(long_addr/BANK_SIZE)
+        addr = (long_addr%BANK_SIZE)+(BANK_SIZE if bank > 0 else 0)
+        return cls(bank,addr)
     
-    mons[mon[0]] = Pokemon(mon[0],sprites[0],sprites[1])
+    def __str__(self) -> str:
+        return f"{self.bank:#04X}:{self.addr:04X}"
 
-for name,data in mons.items():
-    print(f"'{name:12s}',{data}")
-    printPkmnFront(data)
-    print()
-    printPkmnBack(data)
-    print()
+    def __add__(self, other):
+        if isinstance(other, int):
+            diff = other
+        elif isinstance(other, Addr):
+            diff = abs(self.absolute_pos() - other.absolute_pos())
+        return self.convert_to_addr(self.absolute_pos() + diff)
+
+    def __sub__(self, other):
+        if isinstance(other, int):
+            diff = other
+        elif isinstance(other, Addr):
+            diff = abs(self.absolute_pos() - other.absolute_pos())
+        return self.convert_to_addr(self.absolute_pos() - diff)
+
+    def __eq__(self, other) -> bool:
+        return self.absolute_pos() == other.absolute_pos()
+
+    def __gt__(self, other) -> bool:
+        return self.absolute_pos() > other.absolute_pos()
+    
+    def __lt__(self, other) -> bool:
+        return self.absolute_pos() < other.absolute_pos()
+    
+    def __ge__(self, other) -> bool:
+        return self.absolute_pos() >= other.absolute_pos()
+    
+    def __le__(self, other) -> bool:
+        return self.absolute_pos() <= other.absolute_pos()
+    
+    def __ne__(self, other) -> bool:
+        return self.absolute_pos() != other.absolute_pos()
+
+class GBDataPacket:
+    def __init__(self, addr, packet_size, data) -> None:
+        self.addr = addr
+        self.packet_size = packet_size
+        self.data = data
+    
+    @classmethod
+    def get_static_data(cls, addr, packet_size, length):
+        ROM.bytepos = addr.absolute_pos()
+        data = ROM.readlist([f'uint:{packet_size}']*length)
+        return cls(addr,packet_size,data)
+
+    @classmethod
+    def get_var_data(cls, addr, packet_size, target, bytealigned=True):
+        ROM.bytepos = addr.absolute_pos()
+        data = ROM.readto(target,bytealigned)
+        data_list = data.readlist([f'uint:{packet_size}']*int(data.len/packet_size))
+        return cls(addr,packet_size,data_list)
+
+    def collapse(self, rev=False) -> int:
+        out = 0
+        if rev:
+            self.data.reverse()
+        for val in self.data:
+            out = out << self.packet_size
+            out+=val
+        self.data.reverse()
+        return out
+
+    def __str__(self) -> str:
+        return f"{self.addr}  " + " ".join(map((lambda n: f"{n:02x}"), self.data))
+
+    def raw_dump(self) -> str:
+        out = ""
+        out+=(f"Start:{self.addr} Finish:{self.addr+len(self.data)} Length:{(len(self.data))} 2BPP:{len(self.data)/16:0.0f} 1BPP:{len(self.data)/8:0.0f}\n")
+        
+
+        data_fmt = []
+        for i in range(int(len(self.data)/16)):
+            data_fmt.append(f"{(i*16):#07X} " + ' '.join(map(lambda n: f"{n:02X}", self.data[16*i:(16*i)+16])))
+
+        out+=('\n'.join(data_fmt))
+        if (len(self.data) % 16 != 0):
+            out+=(f"\n{len(data_fmt)*16:#07X} " + ' '.join(map(lambda n: f"{n:02X}", self.data[len(data_fmt)*16:])))
+        return out
+
+class Sprite:
+
+    def __init__(self,addr,width,height,data) -> None:
+        self.addr = addr
+        self.width = width
+        self.height = height
+        self.data = data
+
+    def __str__(self):
+        return f"[Loc: {self.addr} => Width: {self.width}, Height: {self.height}]"
+
+    def to_json(self) -> dict:
+        return {'width': self.width, 'height': self.height, 'data': self.to_base64()}
+
+    @classmethod
+    def __expandRLEPacket(cls, bit_length, value) -> BitString:
+        return BitString((bit_length+value+1)*2)
+
+    @classmethod
+    def __findRLEBoundry(cls, sprite_data) -> Bits:
+        length_found = sprite_data.readto('0b0')
+        return length_found
+
+    @classmethod
+    def __mode1(cls,bit_planes,width) -> list:
+        bit_planes[1] = cls.__deltaDecode(bit_planes[1],width)
+        bit_planes[0] = cls.__deltaDecode(bit_planes[0],width)
+        return bit_planes
+
+    @classmethod
+    def __mode2(cls,bit_planes,width) -> list:
+        bit_planes[1] = cls.__deltaDecode(bit_planes[1],width)
+        bit_planes[0] = bit_planes[0] ^ bit_planes[1] 
+        return bit_planes
+
+    @classmethod
+    def __mode3(cls,bit_planes,width) -> list:
+        bit_planes[1] = cls.__deltaDecode(bit_planes[1],width)
+        bit_planes[0] = cls.__deltaDecode(bit_planes[0],width)
+        bit_planes[0] = bit_planes[0] ^ bit_planes[1]
+        return bit_planes
+
+    @classmethod
+    def ___translate(cls, arr,row_num,coloumn_num):
+        matrix = [[0 for x in range(coloumn_num)] for y in range(row_num)]
+        for row in range(row_num):
+            for col in range(int(coloumn_num/8)):
+                for i in range(8):
+                    matrix[row][col+i]=arr[(row*col)+row+i]
+        return matrix
+
+
+    @classmethod
+    def __fillMatrix(cls, arr,row_num, coloumn_num) -> BitArray:
+        #Array math is hard touch numbers at own risk
+        matrix = [[0 for x in range(coloumn_num*4)] for y in range(row_num*8)]
+        for row in range(row_num*8):
+            for col in range(coloumn_num*4):
+                matrix[row][col]=(''.join(arr[((col*row_num*16)+(row*2)):((col*row_num*16)+(row*2))+2].bin))
+            matrix[row] = ''.join(matrix[row])
+        
+        output = BitArray()
+        for out_row in matrix:    
+            output.append('0b'+out_row)
+
+        return output
+
+    @classmethod
+    def __bufferToList(cls, arr, row_num, coloumn_num) -> list:
+        #1 byte per row per tile
+        #1 byte per coloumn per tile
+        bufList = [0] * row_num*BYTE
+        column_bits = coloumn_num*BYTE
+        for row in range(row_num*BYTE):
+            bufList[row]=list(map(int,(','.join(arr[(row*column_bits):((row*column_bits)+column_bits)].bin).split(','))))
+        return bufList
+
+    @classmethod
+    def __combineBuffers(cls,bit_planes,high_bit_plane) -> list:
+        result = [[(bit_planes[high_bit_plane][i][j]<<1) + bit_planes[high_bit_plane^1][i][j]  for j in range(len(bit_planes[high_bit_plane][0]))] for i in range(len(bit_planes[1]))]
+        return result
+
+    @classmethod
+    def __fillTileMatrix(cls, arr, sprite_height_tiles, sprite_width_tiles) -> list:
+        tile_side_px = 8
+        tile_size = tile_side_px*tile_side_px
+        out = []
+        for tile_row in range (sprite_height_tiles):
+            for row in range(tile_side_px):
+                temp = []
+                for col in range (sprite_width_tiles):
+                    temp.extend(arr[((tile_row*tile_size*sprite_width_tiles)+(col*tile_size)+(row*tile_side_px)):((tile_row*tile_size*sprite_width_tiles)+(col*tile_size)+(row*tile_side_px))+tile_side_px])
+                out.append(temp)
+        return out
+
+    def print_pixels(self):
+        for row in self.data:
+            print(','.join(map(str,row)))
+
+    def __to_bignum(self) -> int:
+        output = 0
+        for row in self.data:
+            for col in row:
+                output = output << 2
+                output += col
+        return output
+
+    def to_base64(self) -> str:
+        num = self.__to_bignum()
+        num_bytes = num.to_bytes((int(self.height*self.width*TWO_BPP_TILE_SIZE/BYTE)),'big')
+        return base64.b64encode(num_bytes).decode()
+    
+    @classmethod
+    def __deltaDecode(cls, arr, width) -> BitArray:
+        output = BitArray()
+        currentBit = 0
+        for index, bit in enumerate(arr):
+            if index % (width*8) == 0:
+                currentBit = 0
+            if bit:
+                currentBit = (currentBit ^ 1)
+            
+            output.append('0b%s' % currentBit)
+        return output
+
+    @classmethod
+    def __parseData(cls, packet_type, width, height, bit_plane):
+        while bit_plane.len < (width*height*ONE_BPP_TILE_SIZE):
+            if packet_type == 0:
+                length = cls.__findRLEBoundry(ROM)
+                value = ROM.read((f"uint:{length.len}"))
+                zero_bits = cls.__expandRLEPacket(length.uint,value)
+                bit_plane.append(zero_bits)
+                packet_type = 1
+            else:
+                data_packet = ROM.read('bin:2')
+                if data_packet != '00':
+                    bit_plane.append('0b'+data_packet)
+                else:
+                    packet_type = 0
+
+    @classmethod
+    def parse_pkmn_sprite(cls, addr) -> None:
+        ROM.bytepos = addr.absolute_pos()
+        width = ROM.read('uint:4')
+        height = ROM.read('uint:4')
+        high_bit_plane = ROM.read('uint:1')
+        packet_type = ROM.read('uint:1')
+        bit_planes = [BitArray(), BitArray()]
+        cls.__parseData(packet_type,width,height,bit_planes[1])
+        zip_mode = -1
+        if ROM.peek('uint:1') == 0:
+            zip_mode = ROM.read('uint:1')
+        else:
+            zip_mode = ROM.read('uint:2')
+        packet_type = ROM.read('uint:1')
+
+        cls.__parseData(packet_type,width,height,bit_planes[0])
+
+        bit_planes[0] = cls.__fillMatrix(bit_planes[0],width,height)
+        bit_planes[1] = cls.__fillMatrix(bit_planes[1],width,height)
+
+        if zip_mode == 0:
+            bit_planes = cls.__mode1(bit_planes,width)
+        elif zip_mode == 2:
+            bit_planes = cls.__mode2(bit_planes,width)
+        else:
+            bit_planes = cls.__mode3(bit_planes,width)
+
+        bit_planes[0] = cls.__bufferToList(bit_planes[0],width,height)
+        bit_planes[1] = cls.__bufferToList(bit_planes[1],width,height)
+
+        sprite_data = cls.__combineBuffers(bit_planes,high_bit_plane)
+
+        return cls(addr,width,height,sprite_data)
+
+    @classmethod
+    def decode1BPP(cls, rom, start, finish, height, width):
+        rom.pos = start
+        output = Sprite(int(rom.pos/8),width,height,1)
+        for i in range(int((finish-start)/8)):
+            output.bit_planes[0].append(rom.peek('bits:8'))
+            output.bit_planes[1].append(rom.read('bits:8'))
+        
+        for i in range(2):
+            output.bit_planes[i] = cls.__fillTileMatrix(output.bit_planes[i],height,width)
+
+        output.sprite = cls.__combineBuffers(output)
+
+        return output
+
+    @classmethod
+    def decode2BPP(cls,rom, start, finish, height, width):
+        rom.pos = start
+        output = Sprite(int(rom.pos/8),width,height,1)
+        for i in range(int((finish-start)/16)):
+            output.bit_planes[0].append(rom.read('bits:8'))
+            output.bit_planes[1].append(rom.read('bits:8'))
+        
+        for i in range(2):
+            output.bit_planes[i] = cls.__fillTileMatrix(output.bit_planes[i],height,width)
+
+        output.sprite = cls.__combineBuffers(output)
+
+        return output
+
+    # def pwshOutput(sprite):
+    #     out = []
+    #     for row in range(len(sprite)):
+    #         if row % 2 == 0:
+    #             for top,bottom in zip(sprite[row],sprite[row+1]):
+    #                 out.append((top<<2)+bottom)
+
+    #     print("".join("{:01x}".format(num) for num in out))
+
+    # def poshOutputDebug(strArr):
+    #     out = []
+    #     for i in range(0,len(strArr),2):
+    #         out.append(strArr[i])
+    #         out.append(strArr[i+1])
+    #     return "".join(out)
+
+    # def printPkmnFront(pkmn):
+    #     ### Debug Prints ###
+    #     # print(pkmn.front_sprite)
+    #     # printPixels(pkmn.front_sprite.bit_planes[0])
+    #     # print()
+    #     # printPixels(pkmn.front_sprite.bit_planes[1])
+    #     # print()
+    #     ### Debug Prints ###
+    #     printPixels(pkmn.front_sprite.sprite)
+    # def printPkmnBack(pkmn):
+    #     ### Debug Prints ###
+    #     # print(pkmn.back_sprite)
+    #     # printPixels(pkmn.back_sprite.bit_planes[0])
+    #     # print()
+    #     # printPixels(pkmn.back_sprite.bit_planes[1])
+    #     # print()
+    #     ### Debug Prints ###
+    #     printPixels(pkmn.back_sprite.sprite)
+    # def printPkmn(pkmn,sprite):
+    #     if sprite == 0:
+    #         printPkmnBack(pkmn)
+    #     else:
+    #         printPkmnFront(pkmn)
+
+class GBText:
+    STRING_END = 0x50
+    ALPHABET = {
+        0x00: "",           #charmap "<NULL>"
+        0x49: "^",       #charmap "<PAGE>"
+        #charmap "<PKMN>",    #  "<PK><MN>"
+        #charmap "<_CONT>",   #  implements "<CONT>"
+        #charmap "<SCROLL>",  $4c
+        0x4E: ">",     #Next
+        0x4F: " ",   
+        0x57: "#",
+        0x50: "@",   #charmap "@" string terminator
+        0x51: "*",
+        0x52: "A1",
+        0x53: "A2",
+        0x54: "POKé",
+        0x55: "+",
+        0x58: "$",
+        0x5F: "}",   #charmap "<DEXEND>"
+        0x75: "…",
+        0x7F: " ",
+        0x80: "A",
+        0x81: "B",
+        0x82: "C",
+        0x83: "D",
+        0x84: "E",
+        0x85: "F",
+        0x86: "G",
+        0x87: "H",
+        0x88: "I",
+        0x89: "J",
+        0x8A: "K",
+        0x8B: "L",
+        0x8C: "M",
+        0x8D: "N",
+        0x8E: "O",
+        0x8F: "P",
+        0x90: "Q",
+        0x91: "R",
+        0x92: "S",
+        0x93: "T",
+        0x94: "U",
+        0x95: "V",
+        0x96: "W",
+        0x97: "X",
+        0x98: "Y",
+        0x99: "Z",
+        0x9A: "(",
+        0x9B: ")",
+        0x9C: ":",
+        0x9D: ";",
+        0x9E: "[",
+        0x9F: "]",
+        0xA0: "a",
+        0xA1: "b",
+        0xA2: "c",
+        0xA3: "d",
+        0xA4: "e",
+        0xA5: "f",
+        0xA6: "g",
+        0xA7: "h",
+        0xA8: "i",
+        0xA9: "j",
+        0xAA: "k",
+        0xAB: "l",
+        0xAC: "m",
+        0xAD: "n",
+        0xAE: "o",
+        0xAF: "p",
+        0xB0: "q",
+        0xB1: "r",
+        0xB2: "s",
+        0xB3: "t",
+        0xB4: "u",
+        0xB5: "v",
+        0xB6: "w",
+        0xB7: "x",
+        0xB8: "y",
+        0xB9: "z",
+        0xBA: "é",
+        0xBB: "'d",
+        0xBC: "'l",
+        0xBD: "'s",
+        0xBE: "'t",
+        0xBF: "'v",
+        0xE0: "'",
+        0xE1: "PK",
+        0xE2: "MN",
+        0xE3: "-",
+        0xE4: "'r",
+        0xE5: "'m",
+        0xE6: "?",
+        0xE7: "!",
+        0xE8: ".",
+        0xED: "→",
+        0xEE: "↓",
+        0xEF: "♂",
+
+        0x60: "<BOLD_A>",  #  unused
+        0x61: "<BOLD_B>",  #  unused
+        0x62: "<BOLD_C>",  #  unused
+        0x63: "<BOLD_D>",  #  unused
+        0x64: "<BOLD_E>",  #  unused
+        0x65: "<BOLD_F>",  #  unused
+        0x66: "<BOLD_G>",  #  unused
+        0x67: "<BOLD_H>",  #  unused
+        0x68: "<BOLD_I>",  #  unused
+        0x69: "<BOLD_V>",  
+        0x6A: "<BOLD_S>",  
+        0x6B: "<BOLD_L>",  #  unused
+        0x6C: "<BOLD_M>",  #  unused
+        0x6D: "<COLON>",   #  colon with tinier dots than ":"
+        0x6E: "ぃ",         #  hiragana small i, unused
+        0x6F: "ぅ",         #  hiragana small u, unused
+        0x70: "‘",         #  opening single quote
+        0x71: "’",         #  closing single quote
+        0x72: "“",         #  opening quote
+        0x73: "”",         #  closing quote
+        0x74: "·",         #  middle dot, unused
+        0x75: "…",         #  ellipsis
+        0x76: "ぁ",         #  hiragana small a, unused
+        0x77: "ぇ",         #  hiragana small e, unused
+        0x78: "ぉ",         #  hiragana small o, unused
+
+
+        0x79: "┌",         
+        0x7A: "─",         
+        0x7B: "┐",         
+        0x7C: "│",         
+        0x7D: "└",         
+        0x7E: "┘",         
+        0x7F: " ",         
+
+        0x05: "ガ", 
+        0x06: "ギ",
+        0x07: "グ", 
+        0x08: "ゲ", 
+        0x09: "ゴ", 
+        0x0A: "ザ", 
+        0x0B: "ジ", 
+        0x0C: "ズ", 
+        0x0D: "ゼ", 
+        0x0E: "ゾ", 
+        0x0F: "ダ", 
+        0x10: "ヂ", 
+        0x11: "ヅ", 
+        0x12: "デ", 
+        0x13: "ド", 
+
+        0x19: "バ", 
+        0x1A: "ビ", 
+        0x1B: "ブ", 
+        0x1C: "ボ", 
+
+        0x26: "が", 
+        0x27: "ぎ", 
+        0x28: "ぐ", 
+        0x29: "げ", 
+        0x2A: "ご", 
+        0x2B: "ざ", 
+        0x2C: "じ", 
+        0x2D: "ず", 
+        0x2E: "ぜ", 
+        0x2F: "ぞ", 
+        0x30: "だ", 
+        0x31: "ぢ", 
+        0x32: "づ", 
+        0x33: "で", 
+        0x34: "ど", 
+
+        0x3A: "ば", 
+        0x3B: "び", 
+        0x3C: "ぶ", 
+        0x3D: "べ", 
+        0x3E: "ぼ", 
+
+        0x40: "パ", 
+        0x41: "ピ", 
+        0x42: "プ", 
+        0x43: "ポ", 
+        0x44: "ぱ", 
+        0x45: "ぴ", 
+        0x46: "ぷ", 
+        0x47: "ぺ", 
+        0x48: "ぽ", 
+
+        0x70: "「", 
+        0x71: "」", 
+        0x73: "』", 
+        0x75: "⋯", 
+
+        0x7F: " ", 
+
+        # 0x80: "ア", 
+        # 0x81: "イ", 
+        # 0x82: "ウ", 
+        # 0x83: "エ", 
+        # 0x84: "オ", 
+        # 0x85: "カ", 
+        # 0x86: "キ", 
+        # 0x87: "ク", 
+        # 0x88: "ケ", 
+        # 0x89: "コ", 
+        # 0x8A: "サ", 
+        # 0x8B: "シ", 
+        # 0x8C: "ス", 
+        # 0x8D: "セ", 
+        # 0x8E: "ソ", 
+        # 0x8F: "タ", 
+        # 0x90: "チ", 
+        # 0x91: "ツ", 
+        # 0x92: "テ", 
+        # 0x93: "ト", 
+        # 0x94: "ナ", 
+        # 0x95: "ニ", 
+        # 0x96: "ヌ", 
+        # 0x97: "ネ", 
+        # 0x98: "ノ", 
+        # 0x99: "ハ", 
+        # 0x9A: "ヒ", 
+        # 0x9B: "フ", 
+        # 0x9C: "ホ", 
+        # 0x9D: "マ", 
+        # 0x9E: "ミ", 
+        # 0x9F: "ム", 
+        # 0xA0: "メ", 
+        # 0xA1: "モ", 
+        # 0xA2: "ヤ", 
+        # 0xA3: "ユ", 
+        # 0xA4: "ヨ", 
+        # 0xA5: "ラ", 
+        # 0xA6: "ル", 
+        # 0xA7: "レ", 
+        # 0xA8: "ロ", 
+        # 0xA9: "ワ", 
+        # 0xAA: "ヲ", 
+        # 0xAB: "ン", 
+        # 0xAC: "ッ", 
+        # 0xAD: "ャ", 
+        # 0xAE: "ュ", 
+        # 0xAF: "ョ", 
+        # 0xB0: "ィ", 
+        # 0xB1: "あ", $b1
+        # 0xB2: "い", $b2
+        # 0xB3: "う", $b3
+        # 0xB4: "え", $b4
+        # 0xB5: "お", $b5
+        # 0xB6: "か", $b6
+        # 0xB7: "き", $b7
+        # 0xB8: "く", $b8
+        # 0xB9: "け", $b9
+        # 0xBA: "こ", $ba
+        # 0xBB: "さ", $bb
+        # 0xBC: "し", $bc
+        # 0xBD: "す", $bd
+        # 0xBE: "せ", $be
+        # 0xBF: "そ", $bf
+        # 0xC0: "た", $c0
+        # 0xC1: "ち", $c1
+        # 0xC2: "つ", $c2
+        # 0xC3: "て", $c3
+        # 0xC4: "と", $c4
+        # 0xC5: "な", $c5
+        # 0xC6: "に", $c6
+        # 0xC7: "ぬ", $c7
+        # 0xC8: "ね", $c8
+        # 0xC9: "の", $c9
+        # 0xCA: "は", $ca
+        # 0xCB: "ひ", $cb
+        # 0xCC: "ふ", $cc
+        # 0xCD: "へ", $cd
+        # 0xCE: "ほ", $ce
+        # 0xCF: "ま", $cf
+        # 0xD0: "み", $d0
+        # 0xD1: "む", $d1
+        # 0xD2: "め", $d2
+        # 0xD3 "も", $d3
+        # 0xD4: "や", $d4
+        # 0xD5: "ゆ", $d5
+        # 0xD6: "よ", $d6
+        # 0xD7: "ら", $d7
+        # 0xD8: "り", $d8
+        # 0xD9: "る", $d9
+        # 0xDA: "れ", $da
+        # 0xDB: "ろ", $db
+        # 0xDC: "わ", $dc
+        # 0xDD: "を", $dd
+        # 0xDE: "ん", $de
+        # 0xDF: "っ", $df
+        # 0xE0: "ゃ", $e0
+        # 0xE1: "ゅ", $e1
+        # 0xE2: "ょ", $e2
+        # 0xE3: "ー", $e3
+        # 0xE4: "ﾟ", $e4
+        # 0xE5: "ﾞ", $e5
+        # 0xE6: "？", $e6
+        # 0xE7: "！", $e7
+        # 0xE8: "。", $e8
+
+        # 0xF0: "円", $f0
+
+        # 0xF2: "．", $f2
+        # 0xF3: "／", $f3
+
+        # 0xF4: "ォ", $f4
+
+        0xF0: "¥",
+        0xF1: "×",
+        0xF3: "/",
+        0xF4: ",",
+        0xF5: "♀",
+        0xF6: "0",
+        0xF7: "1",
+        0xF8: "2",
+        0xF9: "3",
+        0xFA: "4",
+        0xFB: "5",
+        0xFC: "6",
+        0xFD: "7",
+        0xFE: "8",
+        0xFF: "9"
+    }
+
+    def decodeText(self) -> str:
+        return list(map(self.ALPHABET.get, self.packet.data))
+
+    def __init__(self,packet) -> None:
+        self.packet = packet
+        self.text =  self.decodeText()
+       
+
+    def __str__(self):
+        return "".join(self.text).strip('@')
+
+ROM = ConstBitStream(filename='Pokemon Red.gb')
+BANK_SIZE = 0x4000
+TWO_BPP_TILE_SIZE = 128
+ONE_BPP_TILE_SIZE = 64
+BYTE = 8
+BIT = 1
+NYBBLE = 4
+TWO_BPP = 2
+ONE_BPP = 1
+
+END_FILE = Addr.convert_to_addr(ROM.len/8)
+
+POKEDEX_ORDER_POINTER = Addr(0x10,0x5024)
+POKEDEX_ENTRY_POINTER = Addr(0x10,0x447e)
+POKEMON_DATA_POINTER  = Addr(0X0E,0x43DE)
+
+datamap = {'Index to Pokedex':  [],
+           'Pokedex Entry Loc': []
+}
+
+pokedex_index_map = []
+pokedex_loc_map = []
+
+for i in range(0,380,2):
+    datamap["Pokedex Entry Loc"].append(GBDataPacket.get_static_data(POKEDEX_ENTRY_POINTER+i,BYTE,2).collapse(rev=True))
+    datamap["Index to Pokedex"].append(GBDataPacket.get_static_data(POKEDEX_ORDER_POINTER+int(i/2),BYTE,1).collapse())
