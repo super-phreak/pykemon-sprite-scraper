@@ -1,4 +1,3 @@
-from re import A, T
 from pokedata import Sprite, GBText, Addr, GBDataPacket as data
 import pokedata
 
