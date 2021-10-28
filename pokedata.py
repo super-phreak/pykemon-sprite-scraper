@@ -677,6 +677,7 @@ class GBText:
     def __str__(self):
         return "".join(self.text).strip('@')
 
+#Constants that have hard pointers in Red/Blue
 ROM = ConstBitStream(filename='Pokemon Red.gb')
 BANK_SIZE = 0x4000
 TWO_BPP_TILE_SIZE = 128
@@ -687,11 +688,15 @@ NYBBLE = 4
 TWO_BPP = 2
 ONE_BPP = 1
 
+POKEMON_NAME_LENGTH = 10
+
 END_FILE = Addr.convert_to_addr(ROM.len/8)
 
 POKEDEX_ORDER_POINTER = Addr(0x10,0x5024)
 POKEDEX_ENTRY_POINTER = Addr(0x10,0x447e)
 POKEMON_DATA_POINTER  = Addr(0X0E,0x43DE)
+POKEMON_NAME_POINTER  = Addr(0x07,0x421e)
+
 
 datamap = {'Index to Pokedex':  [],
            'Pokedex Entry Loc': []

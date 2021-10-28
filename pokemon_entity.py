@@ -22,7 +22,7 @@ class Pokemon:
         0x14-0x1A	TM and HM flags	                7 bytes
         0x1B	    Padding	                        byte
     '''
-    def __init__(self, addr, internal_index, pokedex_num,
+    def __init__(self, addr, internal_index, pokedex_num, name,
                  base_hp, base_attack, base_defense, base_speed,
                  base_special, type1, type2, catch_rate, base_exp_yeild,
                  front_sprite, back_sprite, attacks_lvl_1, growth_rate, 
@@ -30,6 +30,7 @@ class Pokemon:
         self.addr = addr
         self.internal_index = internal_index
         self.pokedex_num = pokedex_num
+        self.name = name
         self.base_hp = base_hp
         self.base_attack = base_attack
         self.base_defense = base_defense
@@ -48,6 +49,7 @@ class Pokemon:
 
     @classmethod
     def from_addr(cls, addr, internal_index) -> None:
+        name = GBText(data.get_static_data(pokedata.POKEMON_NAME_POINTER+(pokedata.POKEMON_NAME_LENGTH*internal_index),pokedata.BYTE,pokedata.POKEMON_NAME_LENGTH))
         pokedex_num = data.get_static_data(addr,pokedata.BYTE,1).collapse()
         base_hp = data.get_static_data(addr+0x01,pokedata.BYTE,1).collapse()
         base_attack = data.get_static_data(addr+0x02,pokedata.BYTE,1).collapse()
@@ -64,7 +66,7 @@ class Pokemon:
         growth_rate = data.get_static_data(addr+0x13,pokedata.BYTE,1).collapse()
         learned_moves = data.get_static_data(addr+0x14,pokedata.BYTE,7).collapse()
         dex_entry = PokedexEntry(Addr(0x10,pokedata.datamap['Pokedex Entry Loc'][internal_index]))
-        return cls(addr, internal_index, pokedex_num, base_hp, base_attack, base_defense, base_speed, base_special, 
+        return cls(addr, internal_index, pokedex_num, name, base_hp, base_attack, base_defense, base_speed, base_special, 
                    type1, type2, catch_rate, base_exp_yeild, front_sprite, back_sprite, attacks_lvl_1, 
                    growth_rate, learned_moves, dex_entry)
 
@@ -97,6 +99,7 @@ class Pokemon:
         return {
             'index': self.internal_index,
             'pokedex': self.pokedex_num,
+            'name': str(self.name),
             'base_stats':{
                 'hp': self.base_hp,
                 'attack': self.base_attack,
